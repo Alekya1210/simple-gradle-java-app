@@ -7,27 +7,46 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                git branch: 'master', url: 'https://github.com/Alekya1210/simple-gradle-java-app.git'
+                git branch: 'master',
+                    url: 'https://github.com/Alekya1210/simple-gradle-java-app.git'
             }
         }
 
-        stage('Build') {
+        stage('Build JAR') {
             steps {
                 sh "./gradlew clean build"
             }
         }
 
-        stage('Test Reports') {
+        stage('Build Docker Image') {
             steps {
-                junit 'build/test-results/test/*.xml'
+                sh 'docker build -t gradle-web-app:latest .'
             }
         }
 
-        stage('Archive Artifact') {
+        stage('Stop Old Container') {
             steps {
-                archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true
+                sh '''
+                    if [ $(docker ps -aq -f name=gradleweb) ]; then
+                        docker rm -f gradleweb || true
+                    fi
+                '''
+            }
+        }
+
+        stage('Run New Container') {
+            steps {
+                sh 'docker run -d -p 9090:8080 --name gradleweb gradle-web-app:latest'
+            }
+        }
+
+        stage('Success') {
+            steps {
+                echo "Application deployed successfully!"
+                echo "Visit your app at: http://${env.NODE_NAME}:9090"
             }
         }
     }
